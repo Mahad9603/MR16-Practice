@@ -1,6 +1,7 @@
 import authModel from "../../models/auth/index.js";
 import { compare, hash } from 'bcrypt';
 import jwt from "jsonwebtoken";
+import tokenModel from "../../models/token/index.js";
 
 
 const userController = {
@@ -30,11 +31,10 @@ const userController = {
     },
     signIn: async (req, res) => {
         try {
-            const payload = req.body;
-
+            const { email, password} = req.body
             const user = await authModel.findOne({
                 where: {
-                    email: payload.email
+                    email,
                 }
             })
 
@@ -43,7 +43,7 @@ const userController = {
             }
 
             const comPasswords = await compare(
-                payload.password, 
+                password, 
                 user.password
             )
 
@@ -51,17 +51,21 @@ const userController = {
                 return res.status(400).json({message: "Invalid Credentials"})
             }
 
+            delete user.dataValues.password;
+
             const data = {
                 id: user.id,
                 firstName: user.firstName,
                 email: user.email
             }
 
-            const token = jwt.sign(data, process.env.JWT_SECRETKEY, {
-                expiresIn: "1h"
-            })
+            const token = jwt.sign(user.dataValues, process.env.JWT_SECRETKEY, {
+                expiresIn: "1h",
+              });
 
-            res.json({message: "User", data, token})
+            await tokenModel.create({token})
+
+            res.json({data: user, token})
         } catch (error) {
             res.status(500).json(error)
         }
